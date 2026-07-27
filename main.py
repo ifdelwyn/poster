@@ -255,16 +255,25 @@ def _run_job(job_id, auth_token, media_path, mode, is_share, main_job, gender, e
         img = Image.open(media_path)
         img = img.convert("RGB")
         target_size = (1080, 1701)
-        img.thumbnail(target_size, Image.LANCZOS)
-        bg = Image.new("RGB", target_size, (0, 0, 0))
-        offset = ((target_size[0] - img.width) // 2, (target_size[1] - img.height) // 2)
-        bg.paste(img, offset)
+        # Resize to fill 1080x1701 (crop excess, no black bars)
+        img_ratio = img.width / img.height
+        target_ratio = target_size[0] / target_size[1]
+        if img_ratio > target_ratio:
+            new_h = target_size[1]
+            new_w = int(new_h * img_ratio)
+        else:
+            new_w = target_size[0]
+            new_h = int(new_w / img_ratio)
+        img = img.resize((new_w, new_h), Image.LANCZOS)
+        left = (img.width - target_size[0]) // 2
+        top = (img.height - target_size[1]) // 2
+        img = img.crop((left, top, left + target_size[0], top + target_size[1]))
 
         large_buf = io.BytesIO()
-        bg.save(large_buf, "JPEG", quality=92)
+        img.save(large_buf, "JPEG", quality=92)
         large_bytes = large_buf.getvalue()
 
-        thumb = bg.resize((400, 628), Image.LANCZOS)
+        thumb = img.resize((400, 628), Image.LANCZOS)
         thumb_buf = io.BytesIO()
         thumb.save(thumb_buf, "PNG")
         thumb_bytes = thumb_buf.getvalue()
