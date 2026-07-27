@@ -273,51 +273,35 @@ def _run_job(job_id, auth_token, media_path, mode, is_share, main_job, gender):
         common_headers["Msdk-Itopencodeparam"] = auth_token
         common_headers.pop("Content-Type", None)
 
-        def api_call(ep, body=None, extra_hdrs=None, max_retries=2):
+        def api_call(ep, body=None, extra_hdrs=None):
             hdrs = {**common_headers, "Content-Type": "application/json"}
             if extra_hdrs:
                 hdrs.update(extra_hdrs)
-            base_url = f"https://kgvn-api.mobagarena.com{ep}"
+            url = f"https://kgvn-api.mobagarena.com{ep}?access_token={auth_token}"
             req_body = json.dumps(body).encode() if body else b"{}"
-            last_err = None
-
-            def _try(url, desc):
-                nonlocal last_err
-                for attempt in range(max_retries + 1):
-                    if attempt > 0:
-                        log("warn", f"Retry {attempt}/{max_retries} {desc}")
-                        time.sleep(1)
-                    try:
-                        req = urllib.request.Request(url, data=req_body, headers=hdrs, method="POST")
-                        with urllib.request.urlopen(req, timeout=30) as r:
-                            raw = r.read()
-                            if r.headers.get("Content-Encoding") == "gzip":
-                                raw = gzip.decompress(raw)
-                            data = json.loads(raw)
-                            if data.get("code") not in (0, None, "0"):
-                                msg = f"code={data.get('code')} msg={data.get('msg','')}"
-                                last_err = msg
-                                if attempt < max_retries:
-                                    continue
-                                return None
-                            return data.get("data") or data
-                    except urllib.error.HTTPError as e:
-                        err_text = e.read().decode(errors="ignore")
-                        last_err = f"HTTP {e.code}: {err_text[:200]}"
-                        if attempt < max_retries:
+            for attempt in range(2):
+                if attempt > 0:
+                    log("warn", f"Retry {ep}")
+                    time.sleep(1)
+                try:
+                    req = urllib.request.Request(url, data=req_body, headers=hdrs, method="POST")
+                    with urllib.request.urlopen(req, timeout=30) as r:
+                        raw = r.read()
+                        if r.headers.get("Content-Encoding") == "gzip":
+                            raw = gzip.decompress(raw)
+                        data = json.loads(raw)
+                        if data.get("code") not in (0, None, "0"):
+                            msg = f"code={data.get('code')} msg={data.get('msg','')}"
+                            if attempt > 0:
+                                raise Exception(f"API error: {msg}")
                             continue
-                        return None
-                return None
-
-            # Try with access_token in URL first (required by saveposter), fallback to header-only
-            result = _try(f"{base_url}?access_token={auth_token}", f"{ep}")
-            if result is not None:
-                return result
-            log("warn", f"Fallback: thử không access_token cho {ep}")
-            result = _try(base_url, f"{ep} (no token)")
-            if result is not None:
-                return result
-            raise Exception(f"API failed: {last_err or 'unknown'}")
+                        return data.get("data") or data
+                except urllib.error.HTTPError as e:
+                    err_text = e.read().decode(errors="ignore")
+                    if attempt > 0:
+                        raise Exception(f"HTTP {e.code}: {err_text[:200]}")
+                    continue
+            raise Exception(f"API failed: {ep}")
 
         if mode == "flowborn":
             # Flowborn flow
