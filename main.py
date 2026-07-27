@@ -427,8 +427,9 @@ def _run_job(job_id, auth_token, media_path, mode, is_share, main_job, gender, e
         # Save poster
         update_progress(80, "Đang lưu poster...")
         cdn = cred_png.get("cdnHost") or "https://kg-camp-ugc.mobagarena.com"
-        pic_path = cred_png.get("path", "")
-        pic_url = f"{cdn}{pic_path}"
+        parts = cred_png.get("path", "").split("/")
+        pfx = "/".join(parts[:max(0, len(parts)-3)]) or ""
+        pic_url = f"{cdn}{pfx}/"
 
         if mode == "flowborn":
             log("info", "savePoster Flowborn...")
