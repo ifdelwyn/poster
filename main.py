@@ -273,26 +273,47 @@ def _run_job(job_id, auth_token, media_path, mode, is_share, main_job, gender):
         common_headers["Msdk-Itopencodeparam"] = auth_token
         common_headers.pop("Content-Type", None)
 
-        def api_call(ep, body=None, extra_hdrs=None):
+        def api_call(ep, body=None, extra_hdrs=None, max_retries=2):
             hdrs = {**common_headers, "Content-Type": "application/json"}
             if extra_hdrs:
                 hdrs.update(extra_hdrs)
-            # Try using auth_token as access_token in URL
-            url = f"https://kgvn-api.mobagarena.com{ep}?access_token={auth_token}"
+            base_url = f"https://kgvn-api.mobagarena.com{ep}"
             req_body = json.dumps(body).encode() if body else b"{}"
-            req = urllib.request.Request(url, data=req_body, headers=hdrs, method="POST")
-            try:
-                with urllib.request.urlopen(req, timeout=30) as r:
-                    raw = r.read()
-                    if r.headers.get("Content-Encoding") == "gzip":
-                        raw = gzip.decompress(raw)
-                    data = json.loads(raw)
-                    if data.get("code") not in (0, None, "0"):
-                        raise Exception(f"API error: code={data.get('code')} msg={data.get('msg','')}")
-                    return data.get("data") or data
-            except urllib.error.HTTPError as e:
-                err_text = e.read().decode(errors="ignore")
-                raise Exception(f"HTTP {e.code}: {err_text[:200]}")
+
+            def _try(url, desc):
+                for attempt in range(max_retries + 1):
+                    if attempt > 0:
+                        log("warn", f"Retry {attempt}/{max_retries} {desc}")
+                        time.sleep(1)
+                    try:
+                        req = urllib.request.Request(url, data=req_body, headers=hdrs, method="POST")
+                        with urllib.request.urlopen(req, timeout=30) as r:
+                            raw = r.read()
+                            if r.headers.get("Content-Encoding") == "gzip":
+                                raw = gzip.decompress(raw)
+                            data = json.loads(raw)
+                            if data.get("code") not in (0, None, "0"):
+                                msg = f"code={data.get('code')} msg={data.get('msg','')}"
+                                if attempt < max_retries:
+                                    continue
+                                raise Exception(f"API error: {msg}")
+                            return data.get("data") or data
+                    except urllib.error.HTTPError as e:
+                        err_text = e.read().decode(errors="ignore")
+                        if attempt < max_retries:
+                            continue
+                        raise Exception(f"HTTP {e.code}: {err_text[:200]}")
+                return None
+
+            # Try without access_token first (preferred), then with it
+            result = _try(base_url, ep)
+            if result is not None:
+                return result
+            log("warn", f"Fallback: thử với access_token trong URL cho {ep}")
+            result = _try(f"{base_url}?access_token={auth_token}", f"{ep}+token")
+            if result is not None:
+                return result
+            raise Exception(f"API failed after retries: {ep}")
 
         if mode == "flowborn":
             # Flowborn flow
@@ -418,8 +439,8 @@ def _run_job(job_id, auth_token, media_path, mode, is_share, main_job, gender):
         # Save poster
         update_progress(80, "Đang lưu poster...")
         cdn = cred_png.get("cdnHost") or "https://kg-camp-ugc.mobagarena.com"
-        pic_dir = os.path.dirname(cred_png.get("path", ""))
-        pic_url = f"{cdn}{pic_dir}/"
+        pic_path = cred_png.get("path", "")
+        pic_url = f"{cdn}{pic_path}"
 
         if mode == "flowborn":
             log("info", "savePoster Flowborn...")
@@ -454,6 +475,13 @@ def _run_job(job_id, auth_token, media_path, mode, is_share, main_job, gender):
         _msdk_jobs[job_id]["done"] = {"ok": 0, "fail": 1}
     finally:
         _msdk_jobs[job_id]["finished"] = True
+        # Cleanup temp file
+        try:
+            if os.path.isfile(media_path):
+                os.remove(media_path)
+                log("dim", "Đã dọn file tạm")
+        except:
+            pass
 
 @app.post("/api/msdk/upload")
 async def msdk_upload(file: UploadFile = File(...)):
