@@ -245,6 +245,7 @@ def _run_job(job_id, auth_token, media_path, mode, is_share, main_job, gender, e
 
     try:
         log("info", "Đang khởi tạo...")
+        log("dim", f"auth_token={auth_token[:20]}... encodeparam={encodeparam[:20] if encodeparam else '(none)'}")
 
         # Step 1: Try to extract auth info from sign bridge
         sb_info = _sb_extract_info(auth_token)
@@ -270,8 +271,12 @@ def _run_job(job_id, auth_token, media_path, mode, is_share, main_job, gender, e
 
         # Step 3: Build common headers
         common_headers = dict(SAVEPOSTER_HEADERS_TEMPLATE)
-        common_headers["Msdk-Itopencodeparam"] = encodeparam or auth_token
         common_headers.pop("Content-Type", None)
+        msdk_ep = encodeparam or auth_token
+        if msdk_ep != auth_token:
+            common_headers["Msdk-Itopencodeparam"] = msdk_ep
+        else:
+            common_headers.pop("Msdk-Itopencodeparam", None)
 
         def api_call(ep, body=None, extra_hdrs=None):
             hdrs = {**common_headers, "Content-Type": "application/json"}
@@ -279,6 +284,7 @@ def _run_job(job_id, auth_token, media_path, mode, is_share, main_job, gender, e
                 hdrs.update(extra_hdrs)
             url = f"https://kgvn-api.mobagarena.com{ep}?access_token={auth_token}"
             req_body = json.dumps(body).encode() if body else b"{}"
+            log("dim", f">> {ep} body={json.dumps(body)[:200]}")
             for attempt in range(2):
                 if attempt > 0:
                     log("warn", f"Retry {ep}")
@@ -291,13 +297,16 @@ def _run_job(job_id, auth_token, media_path, mode, is_share, main_job, gender, e
                             raw = gzip.decompress(raw)
                         data = json.loads(raw)
                         if data.get("code") not in (0, None, "0"):
-                            msg = f"code={data.get('code')} msg={data.get('msg','')}"
+                            msg = f"code={data.get('code')} msg={data.get('msg','')} data={json.dumps(data.get('data'))[:150]}"
+                            log("warn", f"<< {ep} error: {msg}")
                             if attempt > 0:
                                 raise Exception(f"API error: {msg}")
                             continue
+                        log("ok", f"<< {ep} OK")
                         return data.get("data") or data
                 except urllib.error.HTTPError as e:
                     err_text = e.read().decode(errors="ignore")
+                    log("warn", f"<< {ep} HTTP {e.code}: {err_text[:200]}")
                     if attempt > 0:
                         raise Exception(f"HTTP {e.code}: {err_text[:200]}")
                     continue
@@ -430,6 +439,7 @@ def _run_job(job_id, auth_token, media_path, mode, is_share, main_job, gender, e
         parts = cred_png.get("path", "").split("/")
         pfx = "/".join(parts[:max(0, len(parts)-3)]) or ""
         pic_url = f"{cdn}{pfx}/"
+        log("dim", f"picUrl={pic_url} (từ path={cred_png.get('path','')})")
 
         if mode == "flowborn":
             log("info", "savePoster Flowborn...")
