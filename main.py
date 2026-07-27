@@ -279,8 +279,10 @@ def _run_job(job_id, auth_token, media_path, mode, is_share, main_job, gender):
                 hdrs.update(extra_hdrs)
             base_url = f"https://kgvn-api.mobagarena.com{ep}"
             req_body = json.dumps(body).encode() if body else b"{}"
+            last_err = None
 
             def _try(url, desc):
+                nonlocal last_err
                 for attempt in range(max_retries + 1):
                     if attempt > 0:
                         log("warn", f"Retry {attempt}/{max_retries} {desc}")
@@ -294,15 +296,17 @@ def _run_job(job_id, auth_token, media_path, mode, is_share, main_job, gender):
                             data = json.loads(raw)
                             if data.get("code") not in (0, None, "0"):
                                 msg = f"code={data.get('code')} msg={data.get('msg','')}"
+                                last_err = msg
                                 if attempt < max_retries:
                                     continue
-                                raise Exception(f"API error: {msg}")
+                                return None
                             return data.get("data") or data
                     except urllib.error.HTTPError as e:
                         err_text = e.read().decode(errors="ignore")
+                        last_err = f"HTTP {e.code}: {err_text[:200]}"
                         if attempt < max_retries:
                             continue
-                        raise Exception(f"HTTP {e.code}: {err_text[:200]}")
+                        return None
                 return None
 
             # Try without access_token first (preferred), then with it
@@ -313,7 +317,7 @@ def _run_job(job_id, auth_token, media_path, mode, is_share, main_job, gender):
             result = _try(f"{base_url}?access_token={auth_token}", f"{ep}+token")
             if result is not None:
                 return result
-            raise Exception(f"API failed after retries: {ep}")
+            raise Exception(f"API failed: {last_err or 'unknown'}")
 
         if mode == "flowborn":
             # Flowborn flow
