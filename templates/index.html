@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KGVN Poster Changer</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="wrapper">
+
+  <header>
+    <div class="logo">
+      <div class="logo-icon">🎮</div>
+      <div>
+        <div class="logo-title">KGVN Poster Changer</div>
+        <div class="logo-sub">Liên Quân Mobile</div>
+      </div>
+    </div>
+  </header>
+
+  <div class="card" style="animation-delay:0s">
+    <div class="card-head">
+      <div class="step-badge">1</div>
+      <span class="card-title">Xác thực</span>
+    </div>
+    <div class="card-body">
+      <div class="seg-group" style="margin-bottom:12px">
+        <button class="seg-btn active" onclick="setAuthMode('link',this)">🔗 Link KGVN</button>
+        <button class="seg-btn" onclick="setAuthMode('har',this)">📁 File HAR</button>
+        <button class="seg-btn" onclick="setAuthMode('token',this)">🎟️ MSDK Token</button>
+      </div>
+
+      <div id="linkPanel">
+        <input class="inp" id="linkInput" type="text"
+          placeholder="https://kgvn-camp.mobagarena.com/app/player-poster?access_token=..."
+          oninput="parseLinkInput(this.value)">
+        <div style="font-size:11px;color:var(--text3);margin-top:6px">
+          Copy link từ game (Camp → Poster → copy URL) hoặc dùng Stream/Charles
+        </div>
+      </div>
+
+      <div id="harPanel" style="display:none">
+        <div class="upload-zone" id="harZone"
+          ondragover="event.preventDefault();this.classList.add('dragover')"
+          ondragleave="this.classList.remove('dragover')"
+          ondrop="handleHarDrop(event)">
+          <input type="file" accept=".har" id="harFileInput" onchange="handleHarFile(this.files[0])">
+          <div class="upload-icon">📂</div>
+          <div class="upload-text">Kéo &amp; thả file <b>.har</b></div>
+          <div class="upload-hint">hoặc click để chọn</div>
+        </div>
+        <div id="harChip" class="file-chip" style="display:none">
+          📄 <span id="harFileName"></span>
+          <span class="rm" onclick="clearHar()">✕</span>
+        </div>
+      </div>
+
+      <div id="tokenPanel" style="display:none">
+        <textarea class="inp" id="tokenInput" rows="4"
+          placeholder="Dán MSDK token hoặc toàn bộ request headers từ&#10;Stream / Charles / HTTP Canary vào đây...&#10;&#10;Ví dụ: msdk-channelid: 10&#10;camp-source: AOV-CAMP&#10;access_token: abc123...&#10;msdk-itopencodeparam: xyz..."></textarea>
+        <div style="font-size:11px;color:var(--text3);margin-top:6px">
+          Trong Stream: copy headers của request saveposter → dán vào đây
+          <button class="btn" style="padding:3px 10px;font-size:11px;margin-left:6px" onclick="parseTokenInput()">Phân tích</button>
+        </div>
+      </div>
+
+      <div id="encPanel">
+        ⚠️ Flowborn cần header <b>encodeparam</b> — lấy từ F12 → Network, dán vào đây:
+        <input class="inp" id="encInput" type="text" placeholder="encodeparam (nếu có)" style="margin-top:6px">
+      </div>
+
+      <div class="detect-badge" id="detectBadge"></div>
+    </div>
+  </div>
+
+  <div class="card" style="animation-delay:0.08s">
+    <div class="card-head">
+      <div class="step-badge">2</div>
+      <span class="card-title">Ảnh Poster</span>
+    </div>
+    <div class="card-body">
+      <div class="upload-zone"
+        ondragover="event.preventDefault();this.classList.add('dragover')"
+        ondragleave="this.classList.remove('dragover')"
+        ondrop="handleImgDrop(event)">
+        <input type="file" accept="image/*" id="imgFileInput" onchange="handleImgFile(this.files[0])">
+        <div class="upload-icon">🖼️</div>
+        <div class="upload-text">Kéo &amp; thả ảnh hoặc click chọn</div>
+        <div class="upload-hint">PNG · JPG · WEBP — khuyên dùng ảnh dọc</div>
+      </div>
+
+      <div class="or-div">hoặc link ảnh</div>
+
+      <div class="inp-row">
+        <input class="inp" id="imgUrlInput" type="text" placeholder="https://i.imgur.com/...">
+        <button class="btn btn-primary" onclick="loadImgFromUrl()">Tải</button>
+      </div>
+
+      <div class="img-preview-wrap" id="imgPreviewWrap" style="display:none">
+        <div class="img-preview-box">
+          <img id="imgPreviewEl" src="" alt="preview">
+        </div>
+        <div id="imgInfo" style="font-size:11px;color:var(--text3);margin-top:6px"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="animation-delay:0.16s">
+    <div class="card-head">
+      <div class="step-badge">3</div>
+      <span class="card-title">Thực hiện</span>
+    </div>
+    <div class="card-body">
+      <div class="seg-group" style="margin-bottom:12px">
+        <button class="seg-btn active" onclick="setMode('player',this)">
+          <span style="display:block;font-size:16px;margin-bottom:2px">🖼️</span>
+          <span>Nền Load Trận</span>
+        </button>
+        <button class="seg-btn" onclick="setMode('flowborn',this)">
+          <span style="display:block;font-size:16px;margin-bottom:2px">⚔️</span>
+          <span>Flowborn</span>
+        </button>
+      </div>
+
+      <button class="run-btn" id="runBtn" onclick="run()">🚀 ÁP DỤNG</button>
+
+      <div class="progress-wrap" id="progressWrap">
+        <div class="progress-bar-outer">
+          <div class="progress-bar-inner" id="progressBar"></div>
+        </div>
+        <div class="progress-label" id="progressLabel">Đang chuẩn bị...</div>
+      </div>
+
+      <div class="stats-row" id="statsRow" style="display:none">
+        <div class="stat-chip ok">
+          <span class="val" id="statOk">0</span>
+          <span class="lbl">✅ Thành công</span>
+        </div>
+        <div class="stat-chip fail">
+          <span class="val" id="statFail">0</span>
+          <span class="lbl">❌ Thất bại</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="terminal">
+    <div class="term-head">
+      <div class="term-dot r"></div>
+      <div class="term-dot y"></div>
+      <div class="term-dot g"></div>
+      <span class="term-title">Console</span>
+      <button class="term-clear" onclick="clearLog()">Xoá</button>
+    </div>
+    <div class="term-body" id="termBody"></div>
+  </div>
+
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
