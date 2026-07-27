@@ -123,6 +123,20 @@ body::after {
   100% { transform: translateY(-10vh) scale(1); opacity: 0; }
 }
 
+.banner-18 {
+  text-align: center;
+  padding: 10px 16px;
+  margin-bottom: 18px;
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.08), rgba(217, 70, 150, 0.06));
+  border: 1px solid rgba(239, 68, 68, 0.12);
+  border-radius: var(--radius-lg);
+  font-size: 13px;
+  font-weight: 700;
+  color: #f87171;
+  letter-spacing: 0.5px;
+  backdrop-filter: blur(10px);
+}
+
 .wrapper {
   position: relative;
   z-index: 1;
