@@ -732,9 +732,32 @@ function updateStats() {
 // ── Server-side MSDK flow ─────────────────────────────────────────────────
 let _msdkJobId = null;
 let _msdkPollTimer = null;
+let _sbClientReady = false;
+let _sbClientInitialized = false;
 
 function isHexOnly(s) {
   return /^[0-9A-Fa-f]{40,}$/.test(s.trim());
+}
+
+function initClientSignBridge(hexToken) {
+  return new Promise((resolve, reject) => {
+    try {
+      if (typeof __TCSJ__ === 'undefined') {
+        reject(new Error('Chưa load xong'));
+        return;
+      }
+      __TCSJ__.setLoginRes(hexToken, '');
+      _sbClientInitialized = true;
+      const freshEp = __TCSJ__.getEncodeParam('');
+      if (!freshEp || freshEp === 'encodeResponse not set!') {
+        reject(new Error('Không sinh được encodeparam'));
+        return;
+      }
+      resolve(freshEp);
+    } catch (e) {
+      reject(new Error(e.message));
+    }
+  });
 }
 
 async function uploadImgToServer(blob) {
@@ -821,6 +844,18 @@ run = async function() {
       const mainJob = parseInt(document.getElementById('encInput')?.value?.trim()) || 5;
       const gender = 2;
 
+      // Process hex token via client-side sign bridge to get a fresh encodeparam
+      logInf('Đang xử lý mã MSDK...');
+      setProgress(3, 'Giải mã token...');
+      let authToken = state.tokenData._msdkToken;
+      try {
+        const freshEp = await initClientSignBridge(authToken);
+        logOk(`Sign bridge OK — token mới: ${freshEp.slice(0, 16)}...`);
+        authToken = freshEp;
+      } catch (sbErr) {
+        logWarn('Sign bridge client: ' + sbErr.message + ' — dùng token gốc');
+      }
+
       logInf('Upload ảnh lên server...');
       setProgress(5, 'Upload ảnh...');
       const fname = await uploadImgToServer(state.imgOrigBlob);
@@ -828,7 +863,7 @@ run = async function() {
 
       logInf('Khởi tạo job...');
       setProgress(10, 'Khởi tạo...');
-      const jobId = await startMsdkJob(state.tokenData._msdkToken, fname, mode, isShare, mainJob, gender);
+      const jobId = await startMsdkJob(authToken, fname, mode, isShare, mainJob, gender);
       logOk(`Job ID: ${jobId}`);
       _msdkJobId = jobId;
       window._msdkLogOffset = 0;
