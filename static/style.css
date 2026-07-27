@@ -127,14 +127,15 @@ body::after {
   text-align: center;
   padding: 10px 16px;
   margin-bottom: 18px;
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.08), rgba(217, 70, 150, 0.06));
-  border: 1px solid rgba(239, 68, 68, 0.12);
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.08), rgba(239, 68, 68, 0.06));
+  border: 1px solid rgba(251, 191, 36, 0.12);
   border-radius: var(--radius-lg);
   font-size: 13px;
-  font-weight: 700;
-  color: #f87171;
-  letter-spacing: 0.5px;
+  font-weight: 600;
+  color: #fbbf24;
+  letter-spacing: 0.3px;
   backdrop-filter: blur(10px);
+  line-height: 1.5;
 }
 
 .wrapper {
