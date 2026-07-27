@@ -232,7 +232,7 @@ def _sb_extract_info(auth_token):
     except:
         return info
 
-def _run_job(job_id, auth_token, media_path, mode, is_share, main_job, gender):
+def _run_job(job_id, auth_token, media_path, mode, is_share, main_job, gender, encodeparam=""):
     logs = []
     def log(level, msg):
         entry = {"level": level, "msg": msg, "time": time.time()}
@@ -270,7 +270,7 @@ def _run_job(job_id, auth_token, media_path, mode, is_share, main_job, gender):
 
         # Step 3: Build common headers
         common_headers = dict(SAVEPOSTER_HEADERS_TEMPLATE)
-        common_headers["Msdk-Itopencodeparam"] = auth_token
+        common_headers["Msdk-Itopencodeparam"] = encodeparam or auth_token
         common_headers.pop("Content-Type", None)
 
         def api_call(ep, body=None, extra_hdrs=None):
@@ -492,6 +492,7 @@ async def msdk_start(request: Request):
     is_share = body.get("is_share", False)
     main_job = body.get("main_job", 5)
     gender = body.get("gender", 2)
+    encodeparam = (body.get("encodeparam") or "").strip()
 
     if not auth_token:
         return JSONResponse({"error": "Thiếu auth_token"}, 400)
@@ -510,7 +511,7 @@ async def msdk_start(request: Request):
         "done": None,
         "finished": False,
     }
-    _msdk_executor.submit(_run_job, job_id, auth_token, media_path, mode, is_share, main_job, gender)
+    _msdk_executor.submit(_run_job, job_id, auth_token, media_path, mode, is_share, main_job, gender, encodeparam)
     return JSONResponse({"ok": True, "job_id": job_id})
 
 @app.get("/api/msdk/status/{job_id}")

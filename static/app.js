@@ -771,7 +771,7 @@ async function uploadImgToServer(blob) {
   return d.filename;
 }
 
-async function startMsdkJob(authToken, mediaFilename, mode, isShare, mainJob, gender) {
+async function startMsdkJob(authToken, mediaFilename, mode, isShare, mainJob, gender, encodeparam) {
   const resp = await fetch('/api/msdk/start', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -782,6 +782,7 @@ async function startMsdkJob(authToken, mediaFilename, mode, isShare, mainJob, ge
       is_share: isShare,
       main_job: mainJob || 5,
       gender: gender || 2,
+      encodeparam: encodeparam || '',
     }),
   });
   const d = await resp.json();
@@ -847,15 +848,13 @@ run = async function() {
       const gender = 2;
 
       // Process hex token via client-side sign bridge to get a fresh encodeparam
-      logInf('Đang xử lý mã MSDK...');
-      setProgress(3, 'Giải mã token...');
-      let authToken = state.tokenData._msdkToken;
+      const rawHex = state.tokenData._msdkToken;
+      let freshEp = '';
       try {
-        const freshEp = await initClientSignBridge(authToken);
-        logOk(`Sign bridge OK — token mới: ${freshEp.slice(0, 16)}...`);
-        authToken = freshEp;
+        freshEp = await initClientSignBridge(rawHex);
+        logOk(`Sign bridge OK — ep mới: ${freshEp.slice(0, 16)}...`);
       } catch (sbErr) {
-        logWarn('Sign bridge client: ' + sbErr.message + ' — dùng token gốc');
+        logWarn('Sign bridge: ' + sbErr.message + ' — dùng ep gốc');
       }
 
       logInf('Upload ảnh lên server...');
@@ -865,7 +864,7 @@ run = async function() {
 
       logInf('Khởi tạo job...');
       setProgress(10, 'Khởi tạo...');
-      const jobId = await startMsdkJob(authToken, fname, mode, isShare, mainJob, gender);
+      const jobId = await startMsdkJob(rawHex, fname, mode, isShare, mainJob, gender, freshEp);
       logOk(`Job ID: ${jobId}`);
       _msdkJobId = jobId;
       window._msdkLogOffset = 0;
