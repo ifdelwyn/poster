@@ -376,11 +376,11 @@ def _run_job(job_id, auth_token, media_path, mode, is_share, main_job, gender):
             kt = f"{t0};{t1}"
             sk = hmac_sha1(s_key, kt)
 
-    hdrs = {"content-length": str(len(data)), "host": host, "x-cos-forbid-overwrite": "true"}
-    keys = sorted(hdrs.keys())
-    hl = ";".join(keys)
-    hp = "&".join(f"{qenc(k)}={qenc(hdrs[k])}" for k in keys)
-    hs = f"put\n{path}\n\n{hp}\n"
+            hdrs = {"content-length": str(len(data)), "host": host, "x-cos-forbid-overwrite": "true"}
+            keys = sorted(hdrs.keys())
+            hl = ";".join(keys)
+            hp = "&".join(f"{qenc(k)}={qenc(hdrs[k])}" for k in keys)
+            hs = f"put\n{path}\n\n{hp}\n"
             sh = sha1(hs)
             ss = f"sha1\n{kt}\n{sh}\n"
             sig = hmac_sha1(sk, ss)
