@@ -272,11 +272,7 @@ def _run_job(job_id, auth_token, media_path, mode, is_share, main_job, gender, e
         # Step 3: Build common headers
         common_headers = dict(SAVEPOSTER_HEADERS_TEMPLATE)
         common_headers.pop("Content-Type", None)
-        msdk_ep = encodeparam or auth_token
-        if msdk_ep != auth_token:
-            common_headers["Msdk-Itopencodeparam"] = msdk_ep
-        else:
-            common_headers.pop("Msdk-Itopencodeparam", None)
+        common_headers["Msdk-Itopencodeparam"] = auth_token
 
         def api_call(ep, body=None, extra_hdrs=None):
             hdrs = {**common_headers, "Content-Type": "application/json"}
@@ -425,6 +421,7 @@ def _run_job(job_id, auth_token, media_path, mode, is_share, main_job, gender, e
                 conn.close()
                 raise e
 
+        time.sleep(2)  # wait for image propagation
         log("info", "Upload _large...")
         cos_upload(cred_large, large_bytes, "image/jpeg")
         log("ok", "Upload _large OK")
