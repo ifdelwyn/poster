@@ -22,6 +22,10 @@ def _init_sign_bridge():
     global _sb_engine, _sb_ctx, _sb_ready
     try:
         from py_mini_racer import MiniRacer
+    except ImportError:
+        print("[sb] py_mini_racer not installed, sign bridge disabled")
+        return False
+    try:
         _sb_engine = "mini_racer"
         _sb_ctx = MiniRacer()
 
