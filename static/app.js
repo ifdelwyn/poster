@@ -843,7 +843,7 @@ run = async function() {
     try {
       if (!state.imgOrigBlob) throw new Error('Chưa chọn ảnh');
       const mode = state.posterType || 'player';
-      const isShare = false;
+      const isShare = true;
       const mainJob = parseInt(document.getElementById('encInput')?.value?.trim()) || 5;
       const gender = 2;
 

@@ -453,13 +453,24 @@ def _run_job(job_id, auth_token, media_path, mode, is_share, main_job, gender, e
         parts = cred_png.get("path", "").split("/")
         pfx = "/".join(parts[:max(0, len(parts)-3)]) or ""
         pic_url = f"{cdn}{pfx}/"
-        log("dim", f"picUrl={pic_url} (từ path={cred_png.get('path','')})")
+        log("dim", f"picUrl={pic_url} (từ path={cred_png.get('path','')}) cdn={cdn}")
+
+        # Try multiple picUrl formats for saveposter
+        pic_urls = [pic_url]
+        # Also try full file URL
+        cred_path = cred_png.get("path", "")
+        if cred_path:
+            pic_urls.append(f"{cdn}{cred_path}")
+        # Also try directory from os.path.dirname
+        pic_dir = os.path.dirname(cred_path) if cred_path else ""
+        if pic_dir and f"{cdn}{pic_dir}/" not in pic_urls:
+            pic_urls.append(f"{cdn}{pic_dir}/")
 
         if mode == "flowborn":
             log("info", "savePoster Flowborn...")
             api_call("/api/game/poster/flowborn/saveposter", {
-                "posterId": poster_id, "isApply": True, "isShare": is_share, "mainJob": main_job,
-                "picUrl": pic_url,
+                "posterId": poster_id, "isApply": True, "isShare": True, "mainJob": main_job,
+                "picUrl": pic_urls[0],
                 "picInfo": {
                     "bg": {"id": "30", "picUrl": "https://kg-camp.mobagarena.com/manage/flowborn_official/4uxOQChv.png"},
                     "baseInfo": {"id": cfg.get("id"), "gender": gender or 2, "mainJob": main_job, "picUrl": cfg.get("picUrl"), "skinColor": cfg.get("skinColor", 1)},
@@ -468,14 +479,26 @@ def _run_job(job_id, auth_token, media_path, mode, is_share, main_job, gender, e
             })
         else:
             log("info", "savePoster Player...")
-            api_call("/api/game/poster/playerimage/saveposter", {
-                "posterId": poster_id, "isApply": True, "isShare": is_share,
-                "picUrl": pic_url,
-                "picInfo": {
-                    "bg": {"id": "21", "picUrl": "https://kg-camp.mobagarena.com/manage/playerimage_official/iDzT817p.png", "source": 1, "width": 320, "height": 503.99, "posX": 0, "posY": 0},
-                    "stickerList": [],
-                },
-            })
+            last_save_err = None
+            for pu in pic_urls:
+                log("dim", f"Thử picUrl={pu}")
+                try:
+                    api_call("/api/game/poster/playerimage/saveposter", {
+                        "posterId": poster_id, "isApply": True, "isShare": True,
+                        "picUrl": pu,
+                        "picInfo": {
+                            "bg": {"id": "21", "picUrl": "https://kg-camp.mobagarena.com/manage/playerimage_official/iDzT817p.png", "source": 1, "width": 320, "height": 503.99, "posX": 0, "posY": 0},
+                            "stickerList": [],
+                        },
+                    })
+                    log("ok", f"savePoster OK với picUrl={pu}")
+                    break
+                except Exception as e:
+                    last_save_err = e
+                    log("warn", f"picUrl={pu} thất bại: {e}")
+                    continue
+            else:
+                raise last_save_err or Exception("savePoster thất bại với mọi picUrl")
 
         log("ok", f"savePoster OK — Poster ID: {poster_id}")
         update_progress(100, "✅ Hoàn tất!")
