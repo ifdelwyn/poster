@@ -114,7 +114,7 @@ function parseLinkInput(val) {
   if (!val) { badge.classList.remove('visible'); return; }
   try {
     const url = new URL(val);
-    const token = url.searchParams.get('access_token');
+    const token = url.searchParams.get('access_token') || new URLSearchParams(url.hash.replace('#','')).get('access_token');
     if (token) {
       const isFb = val.includes('flowborn');
       badge.textContent = `✅ Detected: ${isFb ? 'Flowborn' : 'Player'} Poster · Token: ${token.slice(0,12)}...`;
@@ -560,11 +560,36 @@ async function run() {
       if (!state.harData) throw new Error('Chưa upload file HAR');
       info = state.harData;
       info.apiBase = 'https://kgvn-api.mobagarena.com';
+    } else if (state.authMode === 'token') {
+      if (!state.tokenData) throw new Error('Chưa dán MSDK token');
+      const t = state.tokenData;
+      const ua = t.ua || 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MSDK/' + (t.version || '5.36.000.9136') + ' mQQAppId/1105779914 mWXAppId/wx7a814e3ceeda8320 mGameId/' + (t.gameid || '1137');
+      info = {
+        headers: {
+          'msdk-channelid': t.channelid || '10',
+          'camp-source': 'AOV-CAMP',
+          'logicworldid': t.partition || '',
+          'user-agent': ua,
+          'msdk-gameid': t.gameid || '1137',
+          'msdk-itopencodeparam': t.itopencodeparam || '',
+          'areaid': t.areaid || '1',
+          'aov-region': t.region || '',
+          'aov-language': t.lang || 'VN',
+          'camp-authtype': 'msdk',
+          'msdk-os': t.os || '2',
+          'origin': 'https://kgvn-camp.mobagarena.com',
+          'referer': 'https://kgvn-camp.mobagarena.com/',
+        },
+        accessToken: t.accessToken,
+        apiBase: 'https://kgvn-api.mobagarena.com',
+        isFlowborn: state.posterType === 'flowborn',
+        mainJob: parseInt(t.heroJob || '5'),
+      };
     } else {
       if (!state.linkStr) throw new Error('Chưa dán link KGVN');
       const url = new URL(state.linkStr);
       const params = Object.fromEntries(url.searchParams);
-      const accessToken = params.access_token || '';
+      const accessToken = params.access_token || new URLSearchParams(url.hash.replace('#','')).get('access_token') || '';
       if (!accessToken) throw new Error('Không tìm thấy access_token trong link');
       const isFlowborn = state.posterType === 'flowborn' || url.pathname.includes('flowborn');
       let ua;
