@@ -1,3 +1,4 @@
+// v2.1 - UI cleanup
 const state = {
   tokenData: null,
   imgOrigBlob: null,
