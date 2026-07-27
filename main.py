@@ -121,14 +121,22 @@ async def upload_image(file: UploadFile = File(...)):
     img = Image.open(io.BytesIO(content))
     img = img.convert("RGB")
     target_size = (1080, 1701)
-    img.thumbnail(target_size, Image.LANCZOS)
-    bg = Image.new("RGB", target_size, (0, 0, 0))
-    offset = ((target_size[0] - img.width) // 2, (target_size[1] - img.height) // 2)
-    bg.paste(img, offset)
+    img_ratio = img.width / img.height
+    target_ratio = target_size[0] / target_size[1]
+    if img_ratio > target_ratio:
+        new_h = target_size[1]
+        new_w = int(new_h * img_ratio)
+    else:
+        new_w = target_size[0]
+        new_h = int(new_w / img_ratio)
+    img = img.resize((new_w, new_h), Image.LANCZOS)
+    left = (img.width - target_size[0]) // 2
+    top = (img.height - target_size[1]) // 2
+    img = img.crop((left, top, left + target_size[0], top + target_size[1]))
     fname = f"{uuid.uuid4().hex}.jpg"
     fpath = os.path.join(UPLOAD_DIR, fname)
-    bg.save(fpath, "JPEG", quality=92)
-    return {"ok": True, "filename": fname, "width": target_size[0], "height": target_size[1]}
+    img.save(fpath, "JPEG", quality=92)
+    return {"ok": True, "filename": fname, "width": 1080, "height": 1701}
 
 @app.post("/api/aov")
 async def aov_proxy(request: Request):
