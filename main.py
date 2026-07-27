@@ -309,12 +309,12 @@ def _run_job(job_id, auth_token, media_path, mode, is_share, main_job, gender):
                         return None
                 return None
 
-            # Try without access_token first (preferred), then with it
-            result = _try(base_url, ep)
+            # Try with access_token in URL first (required by saveposter), fallback to header-only
+            result = _try(f"{base_url}?access_token={auth_token}", f"{ep}")
             if result is not None:
                 return result
-            log("warn", f"Fallback: thử với access_token trong URL cho {ep}")
-            result = _try(f"{base_url}?access_token={auth_token}", f"{ep}+token")
+            log("warn", f"Fallback: thử không access_token cho {ep}")
+            result = _try(base_url, f"{ep} (no token)")
             if result is not None:
                 return result
             raise Exception(f"API failed: {last_err or 'unknown'}")
