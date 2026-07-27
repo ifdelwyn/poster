@@ -746,9 +746,11 @@ function initClientSignBridge(hexToken) {
         reject(new Error('Chưa load xong'));
         return;
       }
+      logDim('Sign bridge methods: ' + Object.keys(__TCSJ__).join(', '));
       __TCSJ__.setLoginRes(hexToken, '');
       _sbClientInitialized = true;
       const freshEp = __TCSJ__.getEncodeParam('');
+      logDim('Fresh encodeparam: ' + (freshEp || '').slice(0, 30));
       if (!freshEp || freshEp === 'encodeResponse not set!') {
         reject(new Error('Không sinh được encodeparam'));
         return;
