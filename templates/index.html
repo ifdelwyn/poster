@@ -57,10 +57,10 @@
       </div>
 
       <div id="tokenPanel" style="display:none">
-        <textarea class="inp" id="tokenInput" rows="4"
-          placeholder="Dán MSDK token hoặc toàn bộ request headers từ&#10;Stream / Charles / HTTP Canary vào đây...&#10;&#10;Ví dụ: msdk-channelid: 10&#10;camp-source: AOV-CAMP&#10;access_token: abc123...&#10;msdk-itopencodeparam: xyz..."></textarea>
+        <textarea class="inp" id="tokenInput" rows="3"
+          placeholder="Dán mã Msdk-Itopencodeparam từ game&#10;(chỉ cần mã hex, không cần access_token)&#10;hoặc paste toàn bộ headers..."></textarea>
         <div style="font-size:11px;color:var(--text3);margin-top:6px">
-          Trong Stream: copy headers của request saveposter → dán vào đây
+          Lấy từ header request trong game hoặc từ Stream/Charles
           <button class="btn" style="padding:3px 10px;font-size:11px;margin-left:6px" onclick="parseTokenInput()">Phân tích</button>
         </div>
       </div>

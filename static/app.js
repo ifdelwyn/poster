@@ -57,6 +57,18 @@ function setAuthMode(mode, btn) {
 
 function parseTokenInput() {
   const raw = document.getElementById('tokenInput').value;
+  const trimmed = raw.trim();
+
+  // Detect hex-only input (msdk-itopencodeparam alone)
+  if (isHexOnly(trimmed)) {
+    state.tokenData = { _msdkOnly: true, _msdkToken: trimmed };
+    const badge = document.getElementById('detectBadge');
+    badge.textContent = `✅ Nhận diện mã MSDK (${trimmed.slice(0, 16)}...)`;
+    badge.classList.add('visible');
+    logOk(`Mã MSDK: ${trimmed.slice(0, 16)}... — dùng chế độ server-side`);
+    return;
+  }
+
   const lines = raw.split('\n').filter(l => l.includes(':') || l.includes('='));
   const parsed = {};
   for (const line of lines) {
@@ -716,6 +728,121 @@ function updateStats() {
   document.getElementById('statOk').textContent = state.stats.ok;
   document.getElementById('statFail').textContent = state.stats.fail;
 }
+
+// ── Server-side MSDK flow ─────────────────────────────────────────────────
+let _msdkJobId = null;
+let _msdkPollTimer = null;
+
+function isHexOnly(s) {
+  return /^[0-9A-Fa-f]{40,}$/.test(s.trim());
+}
+
+async function uploadImgToServer(blob) {
+  const fd = new FormData();
+  fd.append('file', blob, 'image.jpg');
+  const resp = await fetch('/api/msdk/upload', { method: 'POST', body: fd });
+  const d = await resp.json();
+  if (!d.ok) throw new Error(d.error || 'Upload failed');
+  return d.filename;
+}
+
+async function startMsdkJob(authToken, mediaFilename, mode, isShare, mainJob, gender) {
+  const resp = await fetch('/api/msdk/start', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      auth_token: authToken,
+      media_filename: mediaFilename,
+      mode: mode,
+      is_share: isShare,
+      main_job: mainJob || 5,
+      gender: gender || 2,
+    }),
+  });
+  const d = await resp.json();
+  if (d.error) throw new Error(d.error);
+  return d.job_id;
+}
+
+function pollMsdkStatus() {
+  if (!_msdkJobId) return;
+  fetch(`/api/msdk/status/${_msdkJobId}?from=${window._msdkLogOffset || 0}`)
+    .then(r => r.json())
+    .then(d => {
+      if (d.logs && d.logs.length) {
+        for (const e of d.logs) {
+          const icon = { info: 'ℹ️', ok: '✅', error: '❌', warn: '⚠️', gold: '⭐', dim: '▫️' };
+          log(e.level, e.msg);
+        }
+        window._msdkLogOffset = (window._msdkLogOffset || 0) + d.logs.length;
+      }
+      if (d.progress !== undefined) {
+        setProgress(d.progress, d.progLabel || '');
+      }
+      if (d.done) {
+        document.getElementById('statOk').textContent = d.done.ok || 0;
+        document.getElementById('statFail').textContent = d.done.fail || 0;
+        document.getElementById('statsRow').style.display = 'flex';
+        _msdkJobId = null;
+        document.getElementById('runBtn').disabled = false;
+        return;
+      }
+      if (d.finished) {
+        _msdkJobId = null;
+        document.getElementById('runBtn').disabled = false;
+        return;
+      }
+      _msdkPollTimer = setTimeout(pollMsdkStatus, 1000);
+    })
+    .catch(() => {
+      _msdkPollTimer = setTimeout(pollMsdkStatus, 2000);
+    });
+}
+
+function stopMsdkPoll() {
+  if (_msdkPollTimer) { clearTimeout(_msdkPollTimer); _msdkPollTimer = null; }
+}
+
+// ── Override run() to handle MSDK hex-only token ─────────────────────────
+const _origRun = run;
+run = async function() {
+  if (state.authMode === 'token' && state.tokenData && state.tokenData._msdkOnly) {
+    // Server-side flow
+    const btn = document.getElementById('runBtn');
+    btn.disabled = true;
+    setProgress(0, 'Đang chuẩn bị...');
+    logGold('══════════════════════════════');
+    logGold('   KGVN Poster Changer (Server)');
+    logGold('══════════════════════════════');
+    try {
+      if (!state.imgOrigBlob) throw new Error('Chưa chọn ảnh');
+      const mode = state.posterType || 'player';
+      const isShare = false;
+      const mainJob = parseInt(document.getElementById('encInput')?.value?.trim()) || 5;
+      const gender = 2;
+
+      logInf('Upload ảnh lên server...');
+      setProgress(5, 'Upload ảnh...');
+      const fname = await uploadImgToServer(state.imgOrigBlob);
+      logOk(`Upload OK: ${fname}`);
+
+      logInf('Khởi tạo job...');
+      setProgress(10, 'Khởi tạo...');
+      const jobId = await startMsdkJob(state.tokenData._msdkToken, fname, mode, isShare, mainJob, gender);
+      logOk(`Job ID: ${jobId}`);
+      _msdkJobId = jobId;
+      window._msdkLogOffset = 0;
+      pollMsdkStatus();
+    } catch (err) {
+      logErr('❌ Lỗi: ' + err.message);
+      document.getElementById('statFail').textContent = '1';
+      document.getElementById('statsRow').style.display = 'flex';
+      btn.disabled = false;
+    }
+    return;
+  }
+  await _origRun.call(this);
+};
 
 // ── Init ───────────────────────────────────────────────────────────────────
 logInf('Sẵn sàng — dán link KGVN hoặc upload file HAR để bắt đầu');
