@@ -107,7 +107,35 @@
   </div>
 </div>
 
+<div class="card">
+  <div class="card-head">
+    <div class="step-badge" style="background:linear-gradient(135deg,var(--gold),var(--gold2))">?</div>
+    <div class="card-title">Hướng dẫn lấy mã bằng app Stream</div>
+  </div>
+  <div class="card-body">
+    <p class="guide-desc">Sử dụng app <strong>Stream (Network Debug Tool)</strong> trên iOS để bắt gói tin và lấy mã link app (Msdk-Itopencodeparam):</p>
+
+    <a class="guide-link" href="https://apps.apple.com/us/app/stream-network-debug-tool/id1312141691" target="_blank" rel="noopener">
+      <span class="guide-link-icon">📲</span>
+      <span class="guide-link-text">
+        <span class="guide-link-name">Stream Network Debug Tool</span>
+        <span class="guide-link-url">apps.apple.com/us/app/stream-network-debug-tool/id1312141691</span>
+      </span>
+      <span class="guide-link-arrow">→</span>
+    </a>
+
+    <ol class="guide-steps">
+      <li>Tải và cài đặt app <strong>Stream</strong> từ App Store (bấm vào link bên trên).</li>
+      <li>Mở app Stream và nhấn <strong>Start Proxy</strong> để bắt đầu ghi lại gói tin mạng.</li>
+      <li>Mở Liên Quân Mobile và đăng nhập vào tài khoản cần lấy mã.</li>
+      <li>Quay lại app Stream, dừng proxy và tìm request có chứa <code>Msdk-Itopencodeparam</code> (thường là request đăng nhập / login).</li>
+      <li>Copy giá trị mã hex <code>Msdk-Itopencodeparam</code> rồi dán vào ô <strong>Token</strong> ở bước 1.</li>
+    </ol>
+  </div>
+</div>
+
 <footer class="site-footer">
+
   <div class="support-line">
     Không đổi được? <a href="https://www.threads.com/@ur.brace" target="_blank" rel="noopener">Liên hệ hỗ trợ tại đây</a>
   </div>

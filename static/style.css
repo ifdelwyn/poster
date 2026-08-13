@@ -951,6 +951,111 @@ textarea.inp {
   margin-right: 6px;
 }
 
+/* ── Guide Card ── */
+.guide-desc {
+  font-size: 13px;
+  color: var(--text2);
+  line-height: 1.6;
+  margin-bottom: 16px;
+}
+
+.guide-link {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1.5px solid var(--border2);
+  border-radius: var(--radius);
+  background: rgba(255,255,255,0.02);
+  text-decoration: none;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  margin-bottom: 18px;
+}
+
+.guide-link:hover {
+  border-color: var(--accent);
+  background: var(--glow);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(56, 189, 248, 0.1);
+}
+
+.guide-link-icon {
+  font-size: 30px;
+  flex-shrink: 0;
+  filter: drop-shadow(0 4px 16px rgba(56, 189, 248, 0.2));
+}
+
+.guide-link-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.guide-link-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.guide-link-url {
+  font-size: 11px;
+  color: var(--text3);
+  word-break: break-all;
+  font-family: 'Cascadia Code', 'Consolas', monospace;
+}
+
+.guide-link-arrow {
+  margin-left: auto;
+  font-size: 18px;
+  color: var(--accent);
+  flex-shrink: 0;
+  transition: transform 0.3s;
+}
+
+.guide-link:hover .guide-link-arrow {
+  transform: translateX(4px);
+}
+
+.guide-steps {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.guide-steps li {
+  font-size: 13px;
+  color: var(--text2);
+  line-height: 1.6;
+}
+
+.guide-steps li::marker {
+  color: var(--gold);
+  font-weight: 800;
+}
+
+.guide-steps code {
+  background: rgba(56, 189, 248, 0.08);
+  border: 1px solid rgba(56, 189, 248, 0.15);
+  border-radius: 6px;
+  padding: 1px 6px;
+  font-family: 'Cascadia Code', 'Consolas', monospace;
+  font-size: 11.5px;
+  color: var(--accent);
+  word-break: break-all;
+}
+
+body.light .guide-link {
+  background: rgba(0,0,0,0.01);
+}
+
+body.light .guide-steps code {
+  background: rgba(37, 99, 235, 0.06);
+  border-color: rgba(37, 99, 235, 0.15);
+}
+
 /* ── Footer ── */
 .site-footer {
   text-align: center;
