@@ -226,6 +226,20 @@ async def cos_proxy(request: Request):
     except Exception as e:
         return JSONResponse({"error": str(e)}, 502)
 
+@app.post("/api/sb/getcredential")
+async def sb_getcredential_api(request: Request):
+    body = await request.json()
+    auth_token = (body.get("auth_token") or "").strip()
+    if not auth_token:
+        return JSONResponse({"ok": False, "error": "auth_token required"}, 400)
+    try:
+        cred = sb_get_credential(auth_token)
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": f"getcredential failed: {e}"}, 502)
+    if not cred.get("encryption"):
+        return JSONResponse({"ok": False, "error": "getcredential returned empty encryption"}, 502)
+    return JSONResponse({"ok": True, "encryption": cred.get("encryption"), "roleId": cred.get("roleId", "")})
+
 @app.post("/api/sign-bridge/init")
 async def sb_init(request: Request):
     body = await request.json()
@@ -277,7 +291,7 @@ def _sb_extract_info(auth_token):
     except:
         return info
 
-def _run_job(job_id, auth_token, media_path, mode, is_share, main_job, gender, encodeparam=""):
+def _run_job(job_id, auth_token, media_path, mode, is_share, main_job, gender, encodeparam="", encodeparams=None):
     logs = []
     def log(level, msg):
         entry = {"level": level, "msg": msg, "time": time.time()}
@@ -328,25 +342,34 @@ def _run_job(job_id, auth_token, media_path, mode, is_share, main_job, gender, e
         common_headers.pop("Content-Type", None)
         common_headers["Msdk-Itopencodeparam"] = auth_token
 
-        # Generate a fresh Encodeparam from the raw MSDK token via sign bridge
-        fresh_ep = encodeparam or ""
-        try:
-            fresh_ep = sb_get_encodeparam_from_token(auth_token)
-            log("ok", f"Encodeparam OK ({len(fresh_ep)} chars)")
-        except Exception as e:
-            log("warn", f"Không tạo được Encodeparam: {e}")
-        if fresh_ep:
-            common_headers["Encodeparam"] = fresh_ep
+        if encodeparams:
+            log("ok", f"Nhận {len(encodeparams)} Encodeparam từ trình duyệt")
+        elif encodeparam:
+            common_headers["Encodeparam"] = encodeparam
+        else:
+            try:
+                fresh_ep = sb_get_encodeparam_from_token(auth_token)
+                common_headers["Encodeparam"] = fresh_ep
+                log("ok", f"Encodeparam OK ({len(fresh_ep)} chars)")
+            except Exception as e:
+                log("warn", f"Không tạo được Encodeparam: {e}")
 
         def api_call(ep, body=None, extra_hdrs=None):
             hdrs = {**common_headers, "Content-Type": "application/json"}
             if extra_hdrs:
                 hdrs.update(extra_hdrs)
-            try:
-                fresh_ep = sb_get_encodeparam_from_token(auth_token)
-                hdrs["Encodeparam"] = fresh_ep
-            except Exception as e:
-                log("warn", f"Không tạo được Encodeparam: {e}")
+            use_ep = None
+            if encodeparams:
+                use_ep = encodeparams.pop(0)
+            elif encodeparam:
+                use_ep = encodeparam
+            else:
+                try:
+                    use_ep = sb_get_encodeparam_from_token(auth_token)
+                except Exception as e:
+                    log("warn", f"Không tạo được Encodeparam: {e}")
+            if use_ep:
+                hdrs["Encodeparam"] = use_ep
             url = f"https://kgvn-api.mobagarena.com{ep}?access_token={auth_token}"
             req_body = json.dumps(body).encode() if body else b"{}"
             log("dim", f">> {ep} body={json.dumps(body)[:200]}")
@@ -593,6 +616,11 @@ async def msdk_start(request: Request):
     main_job = body.get("main_job", 5)
     gender = body.get("gender", 2)
     encodeparam = (body.get("encodeparam") or "").strip()
+    encodeparams = body.get("encodeparams") or []
+    if isinstance(encodeparams, str):
+        encodeparams = [e for e in encodeparams.split(",") if e.strip()]
+    if isinstance(encodeparams, list):
+        encodeparams = [str(e).strip() for e in encodeparams if str(e).strip()]
 
     if not auth_token:
         return JSONResponse({"error": "Thiếu auth_token"}, 400)
@@ -611,7 +639,7 @@ async def msdk_start(request: Request):
         "done": None,
         "finished": False,
     }
-    _msdk_executor.submit(_run_job, job_id, auth_token, media_path, mode, is_share, main_job, gender, encodeparam)
+    _msdk_executor.submit(_run_job, job_id, auth_token, media_path, mode, is_share, main_job, gender, encodeparam, encodeparams)
     return JSONResponse({"ok": True, "job_id": job_id})
 
 @app.get("/api/msdk/status/{job_id}")

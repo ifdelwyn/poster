@@ -147,13 +147,25 @@ function initClientSignBridge(hexToken) {
         reject(new Error('Chưa load xong __TCSJ__'));
         return;
       }
-      __TCSJ__.setLoginRes(hexToken, '');
-      const freshEp = __TCSJ__.getEncodeParam('');
-      if (!freshEp || freshEp === 'encodeResponse not set!') {
-        reject(new Error('Không sinh được encodeparam'));
-        return;
-      }
-      resolve(freshEp);
+      fetch('/api/sb/getcredential', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ auth_token: hexToken }),
+      })
+        .then(r => r.json())
+        .then(d => {
+          if (!d.ok) { reject(new Error(d.error || 'getcredential failed')); return; }
+          __TCSJ__.setLoginRes(d.encryption, d.roleId);
+          const eps = [];
+          for (let i = 0; i < 20; i++) {
+            const ep = __TCSJ__.getEncodeParam(d.roleId);
+            if (!ep || ep === 'encodeResponse not set!') break;
+            eps.push(ep);
+          }
+          if (!eps.length) { reject(new Error('Không sinh được encodeparam')); return; }
+          resolve(eps);
+        })
+        .catch(e => reject(new Error('getcredential: ' + e.message)));
     } catch (e) {
       reject(new Error(e.message));
     }
@@ -169,14 +181,14 @@ async function uploadImgToServer(blob) {
   return d.filename;
 }
 
-async function startMsdkJob(authToken, mediaFilename, encodeparam) {
+async function startMsdkJob(authToken, mediaFilename, encodeparams) {
   const resp = await fetch('/api/msdk/start', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       auth_token: authToken,
       media_filename: mediaFilename,
-      encodeparam: encodeparam || '',
+      encodeparams: encodeparams || [],
     }),
   });
   const d = await resp.json();
@@ -247,10 +259,10 @@ async function run() {
     // Server-side flow for hex-only MSDK token
     if (state.tokenData._msdkOnly) {
       const rawHex = state.tokenData._msdkToken;
-      let freshEp = '';
+      let eps = [];
       try {
-        freshEp = await initClientSignBridge(rawHex);
-        logOk(`Sign bridge OK — ep: ${freshEp.slice(0, 16)}...`);
+        eps = await initClientSignBridge(rawHex);
+        logOk(`Sign bridge OK — ${eps.length} encodeparam sẵn sàng`);
       } catch (sbErr) {
         logWarn('Sign bridge: ' + sbErr.message);
       }
@@ -262,7 +274,7 @@ async function run() {
 
       logInf('Khởi tạo job...');
       setProgress(10, 'Khởi tạo...');
-      const jobId = await startMsdkJob(rawHex, fname, freshEp);
+      const jobId = await startMsdkJob(rawHex, fname, eps);
       logOk(`Job ID: ${jobId}`);
       _msdkJobId = jobId;
       window._msdkLogOffset = 0;
