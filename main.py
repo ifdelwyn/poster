@@ -17,6 +17,7 @@ _sb_engine = None
 _sb_ctx = None
 _sb_ready = False
 _sb_initialized = False
+_sb_cred_cache = {}
 
 def _init_sign_bridge():
     global _sb_engine, _sb_ctx, _sb_ready
@@ -34,8 +35,8 @@ var window = this;
 var self = this;
 var globalThis = this;
 var crypto = { getRandomValues: function(arr) { for (var i = 0; i < arr.length; i++) arr[i] = Math.floor(Math.random() * 256); return arr; } };
-var btoa = function(s) { return ''; };
-var atob = function(s) { return ''; };
+var btoa = function(s) { s = String(s); var B='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'; var o='', i=0; while(i<s.length){ var a=s.charCodeAt(i++), b=i<s.length?s.charCodeAt(i++):NaN, c=i<s.length?s.charCodeAt(i++):NaN; o+=B[a>>2]+B[((a&3)<<4)|(b>>4)]+(isNaN(b)?'=':B[((b&15)<<2)|(c>>6)])+(isNaN(c)?'=':B[c&63]); } return o; };
+var atob = function(s) { s = String(s).replace(/[^A-Za-z0-9+/=]/g,''); var eq = s.indexOf('='); if (eq >= 0) s = s.slice(0, eq); var B='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'; var o='', i=0; while(i+1<s.length){ var e1=B.indexOf(s[i]), e2=B.indexOf(s[i+1]); var e3=(i+2<s.length)?B.indexOf(s[i+2]):0; var e4=(i+3<s.length)?B.indexOf(s[i+3]):0; o+=String.fromCharCode((e1<<2)|(e2>>4)); if(i+2<s.length) o+=String.fromCharCode(((e2&15)<<4)|(e3>>2)); if(i+3<s.length) o+=String.fromCharCode(((e3&3)<<6)|e4); i+=4; } return o; };
 var navigator = { userAgent: 'Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36', platform: 'Linux armv81', language: 'vi-VN', languages: ['vi-VN','vi','en-US','en'], cookieEnabled: true, onLine: true, hardwareConcurrency: 4, maxTouchPoints: 5 };
 var location = { hostname: 'kgvn-camp.mobagarena.com', href: 'https://kgvn-camp.mobagarena.com/', protocol: 'https:', origin: 'https://kgvn-camp.mobagarena.com', host: 'kgvn-camp.mobagarena.com', pathname: '/' };
 var screen = { width: 412, height: 915, colorDepth: 24 };
@@ -79,6 +80,42 @@ def sb_get_encode_param(roleid=""):
     if not _sb_initialized:
         raise Exception("Sign bridge not initialized, call /api/sign-bridge/init first")
     return _sb_ctx.eval(f"__TCSJ__.getEncodeParam('{roleid.replace(chr(39), chr(92)+chr(39))}')")
+
+def sb_get_credential(auth_token):
+    """Get login encryption + roleId from getcredential API using raw MSDK token."""
+    cache_key = "default"
+    if cache_key in _sb_cred_cache:
+        return _sb_cred_cache[cache_key]
+    headers = dict(SAVEPOSTER_HEADERS_TEMPLATE)
+    headers.pop("Content-Type", None)
+    headers["Msdk-Itopencodeparam"] = auth_token
+    headers["Content-Type"] = "application/json"
+    req = urllib.request.Request(
+        "https://kgvn-api.mobagarena.com/api/user/game/getcredential",
+        data=b"{}", headers=headers, method="POST")
+    with urllib.request.urlopen(req, timeout=30) as r:
+        raw = r.read()
+        if r.headers.get("Content-Encoding") == "gzip":
+            raw = gzip.decompress(raw)
+    data = json.loads(raw)
+    cred = data.get("data") or {}
+    _sb_cred_cache[cache_key] = cred
+    return cred
+
+def sb_get_encodeparam_from_token(auth_token):
+    """Exchange raw MSDK token for a valid Encodeparam via sign bridge."""
+    if not _sb_ready:
+        raise Exception("Sign bridge not ready")
+    cred = sb_get_credential(auth_token)
+    encryption = cred.get("encryption", "")
+    roleid = cred.get("roleId", "")
+    if not encryption:
+        raise Exception("getcredential returned empty encryption")
+    sb_set_login(encryption, roleid)
+    ep = sb_get_encode_param(roleid)
+    if not ep or not isinstance(ep, str) or len(ep) < 8:
+        raise Exception("Failed to generate encodeparam")
+    return ep
 
 # Init sign bridge on startup
 _init_sign_bridge()
@@ -291,10 +328,25 @@ def _run_job(job_id, auth_token, media_path, mode, is_share, main_job, gender, e
         common_headers.pop("Content-Type", None)
         common_headers["Msdk-Itopencodeparam"] = auth_token
 
+        # Generate a fresh Encodeparam from the raw MSDK token via sign bridge
+        fresh_ep = encodeparam or ""
+        try:
+            fresh_ep = sb_get_encodeparam_from_token(auth_token)
+            log("ok", f"Encodeparam OK ({len(fresh_ep)} chars)")
+        except Exception as e:
+            log("warn", f"Không tạo được Encodeparam: {e}")
+        if fresh_ep:
+            common_headers["Encodeparam"] = fresh_ep
+
         def api_call(ep, body=None, extra_hdrs=None):
             hdrs = {**common_headers, "Content-Type": "application/json"}
             if extra_hdrs:
                 hdrs.update(extra_hdrs)
+            try:
+                fresh_ep = sb_get_encodeparam_from_token(auth_token)
+                hdrs["Encodeparam"] = fresh_ep
+            except Exception as e:
+                log("warn", f"Không tạo được Encodeparam: {e}")
             url = f"https://kgvn-api.mobagarena.com{ep}?access_token={auth_token}"
             req_body = json.dumps(body).encode() if body else b"{}"
             log("dim", f">> {ep} body={json.dumps(body)[:200]}")
